@@ -1,8 +1,12 @@
-/*
-This example will receive multiple universes via Artnet and control a strip of ws2811 leds via 
-Paul Stoffregen's excellent OctoWS2811 library: https://www.pjrc.com/teensy/td_libs_OctoWS2811.html
-This example may be copied under the terms of the MIT license, see the LICENSE file for details
-*/
+// Teensy OctoWS28 Artnet Node
+// Studio Jordan Shaw
+// =================
+// Version: V0.2.1
+// 
+// An Artnet node built with Teensy 4.1 + OctoWS28
+// Further documentation in the READEME.md 
+//
+
 
 #include <Artnet.h>
 #include <NativeEthernet.h>
@@ -11,38 +15,44 @@ This example may be copied under the terms of the MIT license, see the LICENSE f
 #include <OctoWS2811.h>
 #include <FastLED.h>
 
+// To help with logevity of LEDs and Octo Board
+// Brightness is set to ~50%
+#define BRIGHTNESS  150
+
+// Throttling refresh for when using 24+ universes
+// ie. 510 leds / 3 universes per pin
+#define FRAMES_PER_SECOND  30
+
+// Turn on / off Serial logs for debugging
+#define DEBUG 0
+
 // OctoWS2811 settings
 const int numPins = 8;
+
+// These are the Octo default pins, can be changed as needed
 byte pinList[numPins] = { 2, 14, 7, 8, 6, 20, 21, 5};
 
-// const int ledsPerStrip = 170; // change for your setup
-// const int ledsPerStrip = 300; // change for your setup
-// const int ledsPerStrip = 340; // change for your setup
-const int ledsPerStrip = 300; // change for your setup
-// const int ledsPerStrip = 600; // change for your setup
-const byte numStrips= 8; // change for your setup
+// Equivelent to 2 DMX universes
+const int ledsPerStrip = 340;
+
+// Octo will always have 8 strips
+// Just recasting num of pins as strips for clarity below
+// change for your setup
+const byte numStrips = numPins;
 
 const int numLeds = ledsPerStrip * numStrips;
+
 // Total number of channels you want to receive (1 led = 3 channels)
 const int numberOfChannels = numLeds * 3;
 
-const int config = WS2811_GRB | WS2811_800kHz;
-// #define NUM_LEDS  2400
-// #define NUM_STRIPS  8
-// #define NUM_LEDS  170
-// #define NUM_STRIPS  1
-// #define BRIGHTNESS  150
-#define BRIGHTNESS  150
-#define FRAMES_PER_SECOND  30
-
-#define DEBUG 0
-
+// Define your FastLED pixels
 CRGB rgbarray[numPins * ledsPerStrip];
 
+// Memory buffer to artnet data
 DMAMEM int displayMemory[ledsPerStrip * numPins * 3 / 4];
 int drawingMemory[ledsPerStrip * numPins * 3 / 4];
 
-// OctoWS2811 leds(ledsPerStrip, displayMemory, drawingMemory, config);
+// Initialize Octo library using FastLED Controller
 OctoWS2811 octo(ledsPerStrip, displayMemory, drawingMemory, WS2811_GRB | WS2811_800kHz, numPins, pinList);
 
 template <EOrder RGB_ORDER = GRB,
@@ -76,7 +86,8 @@ public:
 
 // Artnet settings
 Artnet artnet;
-const int startUniverse = 0; // CHANGE FOR YOUR SETUP most software this is 1, some software send out artnet first universe as 0.
+// CHANGE FOR YOUR SETUP most software this is 1, some software send out artnet first universe as 0.
+const int startUniverse = 0; 
 
 // Check if we got all universes
 const int maxUniverses = numberOfChannels / 512 + ((numberOfChannels % 512) ? 1 : 0);
@@ -85,26 +96,19 @@ bool sendFrame = 1;
 int previousDataLength = 0;
 
 // Change ip and mac address for your setup
-
 // on macos, this mac address is for local host "ether" address
-// for mac, it's en0
-// MBP Mac address
+// for me this was the mac address of `en0`
+// If using a Pi, you'll want to change it to the Pi's mac address. Remember to update when changing devices or enviriments
 byte mac[] = {0x3c, 0x22, 0xfb, 0x87, 0x16, 0x1b};
 
-// RPi Mac address
-// d8:3a:dd:33:ce:41
-// byte mac[] = {0xd8, 0x3a, 0xdd, 0x33, 0xce, 0x41};
-
-
-// IP of network.
-// On mac using a ethernet dongle, this is configured in network
-// On pi: {169, 254, 248, 133} - 169, 254, 248, 133
-
-// on osx w/ dongle
+// Network IP addresses
+// On mac using a ethernet dongle, the IP is configured in the OSX network settings.
+// You wanna set the IP you set for the dongle as the IP here.
+// For every device, the IP will be different. Make sure to update when changing devices or enviroments
 byte ip[] = {192, 168, 1, 12};
-// on Pi w/ dongle
-// byte ip[] = {169, 254, 248, 133};
 
+// From Blinky Light's blog to allow for Fast LED integration + Pin selection
+// https://blinkylights.blog/2021/02/03/using-teensy-4-1-with-fastled/
 CTeensy4Controller<GRB, WS2811_800kHz> *pcontroller;
 
 void setup()
@@ -112,9 +116,9 @@ void setup()
   Serial.begin(115200);
 
   Serial.println("Studio Jordan Shaw");
-  Serial.println("Same Material / Different Time");
+  Serial.println("Teensy OctoWS28 Artnet Node");
   Serial.println("=================");
-  Serial.println("Version: v-0.9.7");
+  Serial.println("Version: V0.2.1");
 
   artnet.begin(mac, ip);
 
@@ -132,17 +136,11 @@ void setup()
 
 void loop()
 {
-
-  // CHSV col = rgbToHsb(255, 0, 0);
-  // Serial.println("col: " + col[0]);
-  // Serial.println("col: " + col[1]);
-  // Serial.println("col: " + col[2]);
-  // Serial.println("--------------");
-
   // we call the read function inside the loop
   artnet.read();
 }
 
+// LED light gamma lookup table
 const uint8_t PROGMEM gamma8[] = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,
@@ -165,7 +163,12 @@ void onDmxFrame(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* d
 {
   sendFrame = 1;
 
-  // Store which universe has got in
+  // Store which universe was received
+  // =============
+  // If your artnet server is not sending the same number of LED data configfured for this node 
+  // ie: the configured number of LED pixels + universes, the LEDs will not turn on.
+  // LED + universe numbers set in this app must match the data the artnet server is sending
+  // =============
   if ((universe - startUniverse) < maxUniverses)
     universesReceived[universe - startUniverse] = 1;
 
@@ -203,22 +206,15 @@ void onDmxFrame(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* d
     Serial.println(sendFrame);
   }
 
-  // read universe and put into the right part of the display buffer
+  // Read universe and put into the right part of the display buffer
   for (int i = 0; i < length / 3; i++)
   {
     int led = i + (universe - startUniverse) * (previousDataLength / 3);
     if (led < numLeds){
-
-      // if(DEBUG){
-      //   Serial.print(artnet.getDmxFrame()[i]);
-      //   Serial.println("  ");
-      // }
-      // rgbarray[led] = CRGB( data[i * 3], data[i * 3 + 1], data[i * 3 + 2]);
-
       rgbarray[led] = CRGB( gamma8[data[i * 3]], gamma8[data[i * 3 + 1]], gamma8[data[i * 3 + 2]] );
-      // rgbarray[led] = byte(artnet.getDmxFrame()[i]);
     }
   }
+
   previousDataLength = length;
 
   if (sendFrame)
@@ -228,11 +224,13 @@ void onDmxFrame(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* d
     }
     
     FastLED.show(); 
+
     // Reset universeReceived to 0
     memset(universesReceived, 0, maxUniverses);
   }
 }
 
+// Blink some lights from setup(), to confirm upload
 void initTest()
 {
   for (int i = 0 ; i < numLeds ; i++)
@@ -251,112 +249,3 @@ void initTest()
     rgbarray[i] = CRGB::Black;
     FastLED.show();
 }
-
-  /**
-   * Converts an RGB color value to HSB / HSV. Conversion formula
-   * adapted from http://en.wikipedia.org/wiki/HSV_color_space.
-   * ported from: https://github.com/carloscabo/colz/blob/master/public/js/colz.class.js
-   *
-   * @param   Number  r       The red color value
-   * @param   Number  g       The green color value
-   * @param   Number  b       The blue color value
-   * @return  Array           The HSB representation
-   */
-   
-//   CHSV rgbToHsb (int r, int g, int b) {
-//     int max; 
-//     int min;
-//     float h = 0;
-//     int s;
-//     int v;
-//     int d;
-
-//     r = r / 255;
-//     g = g / 255;
-//     b = b / 255;
-
-//     max = largest(r, g, b);
-//     min = smallest(r, g, b);
-//     v = max;
-
-//     d = max - min;
-//     if(max == 0){
-//       max = 0;
-//     } else {
-//       max = d / max;
-//     }
-//     // s = max === 0 ? 0 : d / max;
-//     s = max;
-
-//     if (max == min) {
-//       h = 0; // achromatic
-//     } else {
-//       if(max == r){
-//         h = (g - b) / d + (g < b ? 6 : 0); 
-//       } else if(max == g){
-//         h = (b - r) / d + 2; 
-//       } else if (max == b){
-//         h = (r - g) / d + 4; 
-//       }
-//       // switch (max) {
-//       //   case r: h = (g - b) / d + (g < b ? 6 : 0); 
-//       //     break;
-//       //   case g: h = (b - r) / d + 2; 
-//       //     break;
-//       //   case b: h = (r - g) / d + 4; 
-//       //     break;
-//       // }
-//       h = h / 6;
-//     }
-
-//     // map top 360,100,100
-//     h = round(h * 360);
-//     s = round(s * 100);
-//     v = round(v * 100);
-
-//     return CHSV(h, s, v);
-//   };
-
-// int largest(int r, int g, int b){
-//     unsigned int i; 
-
-//     int val[] = {r,g,b};
-
-//     // int[] val = new int[3];
-//     // val[0] = r;  // Assign value to first element in the array
-//     // val[1] = g; // Assign value to second element in the array
-//     // val[2] = b;  // Assign value to third element in the array
-    
-//   // Initialize maximum element 
-//   int max = val[0]; 
-    
-//   // Traverse array elements from second and 
-//   // compare every element with current max 
-//   for (i = 1; i < (sizeof(val) / sizeof(val[0])); i++) 
-//       if (val[i] > max) 
-//           max = val[i]; 
-    
-//   return max;
-// }
-
-// int smallest(int r, int g, int b){
-//     unsigned int i; 
-//     int val[] = {r,g,b};
-
-//     // int[] val = new int[3];
-//     // val[0] = r;  // Assign value to first element in the array
-//     // val[1] = g; // Assign value to second element in the array
-//     // val[2] = b;  // Assign value to third element in the array
-    
-//   // Initialize maximum element 
-//   int min = val[0]; 
-    
-//   // Traverse array elements from second and 
-//   // compare every element with current max 
-//   for (i = 1; i < (sizeof(val) / sizeof(val[0])); i++) 
-//       if (val[i] < min) 
-//           min = val[i]; 
-    
-//   return min;
-// }
-
